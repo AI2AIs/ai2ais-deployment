@@ -161,7 +161,6 @@ jobs:
                 rm -rf services/ai2ais-frontend/.git
               fi
               
-              # Submodule'ları tamamen sıfırla
               git submodule deinit -f . || true
               rm -rf .git/modules/services/ai2ais-core
               rm -rf .git/modules/services/ai2ais-frontend
@@ -175,7 +174,26 @@ jobs:
             echo "Force updating submodules..."
             git submodule update --init --recursive --force
 
-            echo "Current submodule status:"
+            echo "FORCING SUBMODULES TO LATEST COMMITS..."
+            
+            # Force update core to latest main
+            echo "Updating core submodule to latest main..."
+            cd services/ai2ais-core
+            git fetch origin main
+            git checkout main
+            git reset --hard origin/main
+            echo "Core is now at: $(git rev-parse HEAD)"
+            echo "Core Dockerfile first line: $(head -1 Dockerfile)"
+            
+            # Force update frontend to latest main
+            cd ../ai2ais-frontend
+            git fetch origin main
+            git checkout main
+            git reset --hard origin/main
+            echo "Frontend is now at: $(git rev-parse HEAD)"
+            
+            cd ../..
+            echo "Current submodule status after force update:"
             git submodule status
             
             echo "Directory structure:"
