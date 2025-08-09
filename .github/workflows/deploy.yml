@@ -141,26 +141,44 @@ jobs:
             echo "Preparing deployment directory..."
             
             if [ ! -d "~/ai2ais-deployment/.git" ]; then
-               echo "Git repository not found. Creating new..."
-               rm -rf ~/ai2ais-deployment
-               mkdir -p ~/ai2ais-deployment
-               cd ~/ai2ais-deployment
-               git clone --recursive https://github.com/AI2AIs/ai2ais-deployment.git .
-             else
-               echo "Git repository exists. Updating..."
-               cd ~/ai2ais-deployment
-             fi
+              echo "Git repository not found. Creating new..."
+              rm -rf ~/ai2ais-deployment
+              mkdir -p ~/ai2ais-deployment
+              cd ~/ai2ais-deployment
+              git clone --recursive https://github.com/AI2AIs/ai2ais-deployment.git .
+            else
+              echo "Git repository exists. Updating..."
+              cd ~/ai2ais-deployment
+              
+              # Submodule dizinlerini temizle
+              echo "Cleaning submodule directories..."
+              if [ -d "services/ai2ais-core" ]; then
+                rm -rf services/ai2ais-core/.env*
+                rm -rf services/ai2ais-core/.git
+              fi
+              if [ -d "services/ai2ais-frontend" ]; then
+                rm -rf services/ai2ais-frontend/.env*
+                rm -rf services/ai2ais-frontend/.git
+              fi
+              
+              # Submodule'ları tamamen sıfırla
+              git submodule deinit -f . || true
+              rm -rf .git/modules/services/ai2ais-core
+              rm -rf .git/modules/services/ai2ais-frontend
+            fi
 
             echo "Fetching latest changes..."
             git fetch origin
             git reset --hard origin/production
             git config --global url."https://x-access-token:${GH_PAT}@github.com/".insteadOf "https://github.com/"
+            
+            echo "Force updating submodules..."
             git submodule update --init --recursive --force
 
             echo "Current submodule status:"
             git submodule status
             
-            echo " Directory structure:"
+            echo "Directory structure:"
             ls -la services/
           ENDSSH
           
