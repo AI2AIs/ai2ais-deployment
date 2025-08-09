@@ -132,10 +132,11 @@ jobs:
         env:
           SERVER_HOST: ${{ secrets.DO_HOST }}
           SERVER_USER: ${{ secrets.DO_USER }}
+          GH_PAT: ${{ secrets.GH_PAT }}
         run: |
           echo " Starting AI2AIs deployment to server..."
           
-          ssh $SERVER_USER@$SERVER_HOST 'bash -s' << 'ENDSSH'
+          ssh $SERVER_USER@$SERVER_HOST "GH_PAT='$GH_PAT' bash -s" << 'ENDSSH'
             set -e  # Exit on any error
             echo "Preparing deployment directory..."
             
@@ -169,7 +170,7 @@ jobs:
           scp services/ai2ais-frontend/.env.production $SERVER_USER@$SERVER_HOST:~/ai2ais-deployment/services/ai2ais-frontend/.env.production
           
           echo " Deploying AI2AIs with Docker..."
-          ssh $SERVER_USER@$SERVER_HOST 'bash -s' << 'ENDSSH'
+          ssh $SERVER_USER@$SERVER_HOST "GH_PAT='$GH_PAT' bash -s" << 'ENDSSH'
             set -e  # Exit on any error
             cd ~/ai2ais-deployment
 
