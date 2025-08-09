@@ -103,7 +103,6 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./services/ai2ais-core/scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
-      - ./config/postgresql.conf:/etc/postgresql/postgresql.conf:ro
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ai2ais_user -d ai2ais_db"]
