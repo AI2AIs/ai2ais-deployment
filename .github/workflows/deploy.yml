@@ -145,25 +145,16 @@ jobs:
               rm -rf ~/ai2ais-deployment
               mkdir -p ~/ai2ais-deployment
               cd ~/ai2ais-deployment
-              git clone --recursive https://github.com/AI2AIs/ai2ais-deployment.git .
+              git clone https://github.com/AI2AIs/ai2ais-deployment.git .
+              git submodule update --init --recursive
             else
               echo "Git repository exists. Updating..."
               cd ~/ai2ais-deployment
-              
-              # Submodule dizinlerini temizle
-              echo "Cleaning submodule directories..."
-              if [ -d "services/ai2ais-core" ]; then
-                rm -rf services/ai2ais-core/.env*
-                rm -rf services/ai2ais-core/.git
-              fi
-              if [ -d "services/ai2ais-frontend" ]; then
-                rm -rf services/ai2ais-frontend/.env*
-                rm -rf services/ai2ais-frontend/.git
-              fi
-              
-              git submodule deinit -f . || true
-              rm -rf .git/modules/services/ai2ais-core
-              rm -rf .git/modules/services/ai2ais-frontend
+              git fetch origin
+              git reset --hard origin/production
+              git clean -fd
+              git submodule foreach --recursive 'git clean -fd'
+              git submodule update --init --recursive --force
             fi
 
             echo "Fetching latest changes..."
