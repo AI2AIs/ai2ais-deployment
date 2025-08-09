@@ -1,0 +1,45 @@
+### .gitignore
+```gitignore
+# Environment files
+.env
+.env.local
+.env.production
+.env.staging
+
+# Logs
+logs/**/*.log
+*.log
+
+# Temporary files
+temp/*
+!temp/.gitkeep
+
+# SSL certificates
+ssl/*.pem
+ssl/*.key
+ssl/*.crt
+
+# Docker volumes
+postgres_data/
+qdrant_data/
+redis_data/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+
+# Backup files
+backups/
+*.backup
+*.sql.gz
+
+# Local development
+docker-compose.override.yml

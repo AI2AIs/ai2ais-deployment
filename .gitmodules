@@ -1,0 +1,9 @@
+[submodule "services/ai2ais-core"]
+	path = services/ai2ais-core
+	url = https://github.com/AI2AIs/ai2ais-core.git
+	branch = main
+
+[submodule "services/ai2ais-frontend"]
+	path = services/ai2ais-frontend
+	url = https://github.com/AI2AIs/ai2ais-frontend.git
+	branch = main

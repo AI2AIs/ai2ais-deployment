@@ -1,0 +1,245 @@
+name: Deploy AI2AIs to Server
+on:
+  push:
+    branches: [ production ]
+  repository_dispatch:
+    types: [ai2ais-core-update, ai2ais-frontend-update]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: true
+          fetch-depth: 0
+          token: ${{ secrets.GH_PAT }}
+
+      - name: Update submodules
+        if: github.event_name == 'repository_dispatch'
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: |
+          git config --global user.name 'GitHub Actions'
+          git config --global user.email 'actions@github.com'
+          git remote set-url origin https://x-access-token:${GH_PAT}@github.com/AI2AIs/ai2ais-deployment.git
+
+          git checkout production
+
+          # Force update specific submodule based on dispatch type
+          if [ "${{ github.event.action }}" == "ai2ais-core-update" ]; then
+            echo "🤖 Updating AI2AIs Core submodule..."
+            cd services/ai2ais-core
+            git fetch origin main
+            git checkout main
+            git reset --hard origin/main
+            cd ../..
+          elif [ "${{ github.event.action }}" == "ai2ais-frontend-update" ]; then
+            echo "🎭 Updating AI2AIs Frontend submodule..."
+            cd services/ai2ais-frontend
+            git fetch origin main
+            git checkout main
+            git reset --hard origin/main
+            cd ../..
+          else
+            # Update all submodules
+            echo "🔄 Updating all submodules..."
+            git submodule foreach --recursive '
+              git fetch origin
+              git checkout main
+              git reset --hard origin/main
+              git clean -fd
+            '
+          fi
+          
+          # Update the parent repo's reference to the submodules
+          git add .
+          git diff --staged --quiet || git commit -m "🚀 Update submodules: ${{ github.event.action }}"
+          git push origin production || echo "No changes to push"
+
+      - name: Create Environment Files
+        env:
+          # AI2AIs Core Environment
+          AI2AIS_CORE_ENV: ${{ secrets.AI2AIS_CORE_ENV }}
+          
+          # AI2AIs Frontend Environment  
+          AI2AIS_FRONTEND_ENV: ${{ secrets.AI2AIS_FRONTEND_ENV }}
+          
+          # Global Environment
+          GLOBAL_ENV: ${{ secrets.GLOBAL_ENV }}
+          
+          # Database passwords
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          
+        run: |
+          echo "📁 Creating environment files..."
+          
+          # Global environment file
+          if [ -z "$GLOBAL_ENV" ]; then
+            echo "❌ Error: GLOBAL_ENV is not set"
+            exit 1
+          fi
+          echo "$GLOBAL_ENV" > .env
+          
+          # AI2AIs Core environment
+          mkdir -p services/ai2ais-core
+          if [ -z "$AI2AIS_CORE_ENV" ]; then
+            echo "❌ Error: AI2AIS_CORE_ENV is not set"
+            exit 1
+          fi
+          echo "$AI2AIS_CORE_ENV" > services/ai2ais-core/.env.production
+          
+          # AI2AIs Frontend environment
+          mkdir -p services/ai2ais-frontend
+          if [ -z "$AI2AIS_FRONTEND_ENV" ]; then
+            echo "⚠️ Warning: AI2AIS_FRONTEND_ENV is not set, using defaults"
+            echo "NEXT_PUBLIC_API_URL=http://localhost:3002" > services/ai2ais-frontend/.env.production
+            echo "NEXT_PUBLIC_WS_URL=ws://localhost:3002" >> services/ai2ais-frontend/.env.production
+            echo "NODE_ENV=production" >> services/ai2ais-frontend/.env.production
+          else
+            echo "$AI2AIS_FRONTEND_ENV" > services/ai2ais-frontend/.env.production
+          fi
+          
+          # Verify files were created
+          echo "✅ Environment files created:"
+          ls -la .env services/*/env.production || true
+
+      - name: Setup SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.DO_SSH_PRIVATE_KEY }}
+          SERVER_HOST: ${{ secrets.DO_HOST }}
+          SERVER_USER: ${{ secrets.DO_USER }}
+        run: |
+          if [ -z "$SSH_PRIVATE_KEY" ]; then
+            echo "❌ Error: SSH_PRIVATE_KEY is not set"
+            exit 1
+          fi
+          
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H $SERVER_HOST >> ~/.ssh/known_hosts
+          
+          # Test SSH connection
+          echo "🔑 Testing SSH connection..."
+          if ! ssh -q $SERVER_USER@$SERVER_HOST exit; then
+            echo "❌ Error: SSH connection failed"
+            exit 1
+          fi
+          echo "SSH connection successful"
+
+      - name: Deploy to Server
+        env:
+          SERVER_HOST: ${{ secrets.DO_HOST }}
+          SERVER_USER: ${{ secrets.DO_USER }}
+        run: |
+          echo " Starting AI2AIs deployment to server..."
+          
+          ssh $SERVER_USER@$SERVER_HOST 'bash -s' << 'ENDSSH'
+            set -e  # Exit on any error
+            echo "Preparing deployment directory..."
+            
+            if [ ! -d "~/ai2ais-deployment/.git" ]; then
+               echo "Git repository not found. Creating new..."
+               rm -rf ~/ai2ais-deployment
+               mkdir -p ~/ai2ais-deployment
+               cd ~/ai2ais-deployment
+               git clone --recursive https://github.com/AI2AIs/ai2ais-deployment.git .
+             else
+               echo "Git repository exists. Updating..."
+               cd ~/ai2ais-deployment
+             fi
+
+            echo "Fetching latest changes..."
+            git fetch origin
+            git reset --hard origin/production
+            git submodule update --init --recursive --force
+
+            echo "Current submodule status:"
+            git submodule status
+            
+            echo " Directory structure:"
+            ls -la services/
+          ENDSSH
+          
+          echo "📁 Copying environment files to server..."
+          scp .env $SERVER_USER@$SERVER_HOST:~/ai2ais-deployment/.env
+          scp services/ai2ais-core/.env.production $SERVER_USER@$SERVER_HOST:~/ai2ais-deployment/services/ai2ais-core/.env.production
+          scp services/ai2ais-frontend/.env.production $SERVER_USER@$SERVER_HOST:~/ai2ais-deployment/services/ai2ais-frontend/.env.production
+          
+          echo " Deploying AI2AIs with Docker..."
+          ssh $SERVER_USER@$SERVER_HOST 'bash -s' << 'ENDSSH'
+            set -e  # Exit on any error
+            cd ~/ai2ais-deployment
+
+            echo " Stopping existing containers..."
+            docker compose down --remove-orphans || true
+            
+            echo " Pulling latest Docker images..."
+            docker compose pull || true
+            
+            echo " Building and starting AI2AIs ecosystem..."
+            docker compose up -d --build
+            
+            echo " Cleaning up old Docker images..."
+            docker image prune -f || true
+            
+            echo " Waiting for services to start..."
+            sleep 45
+            
+            echo " Performing health checks..."
+            
+            # Check AI2AIs Core
+            for i in {1..10}; do
+              if curl -f http://localhost:3002/health > /dev/null 2>&1; then
+                echo " AI2AIs Core is healthy!"
+                break
+              else
+                echo "⏳ Waiting for AI2AIs Core... ($i/10)"
+                sleep 10
+              fi
+              
+              if [ $i -eq 10 ]; then
+                echo " AI2AIs Core health check failed!"
+                docker compose logs ai2ais-core
+                exit 1
+              fi
+            done
+            
+            # Check Frontend (if exists)
+            if docker compose ps ai2ais-frontend >/dev/null 2>&1; then
+              for i in {1..5}; do
+                if curl -f http://localhost:3000 > /dev/null 2>&1; then
+                  echo " AI2AIs Frontend is healthy!"
+                  break
+                else
+                  echo "⏳ Waiting for AI2AIs Frontend... ($i/5)"
+                  sleep 10
+                fi
+                
+                if [ $i -eq 5 ]; then
+                  echo " AI2AIs Frontend health check failed (non-critical)"
+                  docker compose logs ai2ais-frontend || true
+                fi
+              done
+            else
+              echo " AI2AIs Frontend not deployed"
+            fi
+            
+            echo ""
+            echo " AI2AIs deployment completed successfully!"
+            echo "  Services:"
+            echo "   API: http://localhost:3002"
+            echo "   Health: http://localhost:3002/health" 
+            echo "   Characters: http://localhost:3002/api/characters"
+            echo "   WebSocket: ws://localhost:3002/ws/{session_id}"
+            
+            if docker compose ps ai2ais-frontend >/dev/null 2>&1; then
+              echo "   Frontend: http://localhost:3000"
+            fi
+            
+            echo ""
+            echo " Container Status:"
+            docker compose ps
+            
+          ENDSSH

@@ -1,0 +1,234 @@
+services:
+  # AI2AIs Core API
+  ai2ais-core:
+    build: 
+      context: ./services/ai2ais-core
+      dockerfile: Dockerfile
+      args:
+        - DATABASE_URL=postgresql://ai2ais_user:${POSTGRES_PASSWORD}@postgres:5432/ai2ais_db
+        - QDRANT_HOST=qdrant
+        - REDIS_URL=redis://redis:6379
+    networks:
+      - frontend
+      - backend
+      - ai-services
+    expose:
+      - "3002"
+    ports:
+      - "3002:3002"  # Direct access during development
+    env_file:
+      - ./services/ai2ais-core/.env.production
+    environment:
+      # Database connections (internal network)
+      - DATABASE_URL=postgresql://ai2ais_user:${POSTGRES_PASSWORD}@postgres:5432/ai2ais_db
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
+      - REDIS_URL=redis://redis:6379
+      
+      # Application settings
+      - DEBUG=false
+      - NODE_ENV=production
+      - FRONTEND_URL=http://ai2ais-frontend:3000
+      - PYTHON_ENV=production
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./data/voices:/app/data/voices:ro
+      - ./logs/core:/app/logs
+      - ./temp:/app/temp
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3002/health || exit 1"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+      start_period: 60s
+
+  # AI2AIs Frontend (Optional)
+  ai2ais-frontend:
+    build: 
+      context: ./services/ai2ais-frontend
+      dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:3002}
+        - NEXT_PUBLIC_WS_URL=${NEXT_PUBLIC_WS_URL:-ws://localhost:3002}
+        - NODE_ENV=production
+    networks:
+      - frontend
+    expose:
+      - "3000"
+    env_file:
+      - ./services/ai2ais-frontend/.env.production
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=http://ai2ais-core:3002
+      - NEXT_PUBLIC_WS_URL=ws://ai2ais-core:3002
+      - AI2AIS_CORE_API_URL=http://ai2ais-core:3002
+    restart: unless-stopped
+    depends_on:
+      - ai2ais-core
+    volumes:
+      - ./logs/frontend:/app/logs
+    profiles:
+      - frontend  # Optional service
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 45s
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    networks:
+      - backend
+    expose:
+      - "5432"
+    ports:
+      - "5432:5432"  # External access for development
+    environment:
+      POSTGRES_DB: ai2ais_db
+      POSTGRES_USER: ai2ais_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+      # Performance tuning
+      POSTGRES_SHARED_BUFFERS: 256MB
+      POSTGRES_EFFECTIVE_CACHE_SIZE: 1GB
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./services/ai2ais-core/scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+      - ./config/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ai2ais_user -d ai2ais_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf
+
+  # Qdrant Vector Database
+  qdrant:
+    image: qdrant/qdrant:v1.12.0
+    networks:
+      - backend
+      - ai-services
+    expose:
+      - "6333"
+      - "6334"
+    ports:
+      - "6333:6333"  # External access for development
+      - "6334:6334"  # gRPC port
+    environment:
+      - QDRANT__SERVICE__HTTP_PORT=6333
+      - QDRANT__SERVICE__GRPC_PORT=6334
+      - QDRANT__STORAGE__PERFORMANCE__MAX_SEARCH_THREADS=4
+    volumes:
+      - qdrant_data:/qdrant/storage
+      - ./config/qdrant.yaml:/qdrant/config/production.yaml:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:6333/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    networks:
+      - backend
+    expose:
+      - "6379"
+    ports:
+      - "6379:6379"  # External access for development
+    volumes:
+      - redis_data:/data
+      - ./config/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    command: redis-server /usr/local/etc/redis/redis.conf
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    networks:
+      frontend:
+        aliases:
+          - nginx
+      backend:
+        aliases:
+          - nginx-internal
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./config/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+      - ./logs/nginx:/var/log/nginx
+    depends_on:
+      - ai2ais-core
+    restart: unless-stopped
+    profiles:
+      - nginx  # Optional service
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # AI2AIs Monitor (Optional - Health monitoring)
+  ai2ais-monitor:
+    build:
+      context: ./services/ai2ais-monitor
+      dockerfile: Dockerfile
+    networks:
+      - backend
+      - internet
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    expose:
+      - "8080"
+    environment:
+      - PYTHON_ENV=production
+      - AI2AIS_CORE_URL=http://ai2ais-core:3002
+      - POSTGRES_URL=postgresql://ai2ais_user:${POSTGRES_PASSWORD}@postgres:5432/ai2ais_db
+      - QDRANT_URL=http://qdrant:6333
+      - REDIS_URL=redis://redis:6379
+    restart: unless-stopped
+    depends_on:
+      - ai2ais-core
+      - postgres
+    profiles:
+      - monitoring  # Optional service
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  qdrant_data:
+    driver: local
+
+networks:
+  frontend:
+    driver: bridge
+  backend:
+    internal: true  # Secure internal network
+    driver: bridge
+  ai-services:
+    internal: true  # AI services communication
+    driver: bridge
+  internet:
+    driver: bridge
