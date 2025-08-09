@@ -54,7 +54,7 @@ jobs:
           
           # Update the parent repo's reference to the submodules
           git add .
-          git diff --staged --quiet || git commit -m "🚀 Update submodules: ${{ github.event.action }}"
+          git diff --staged --quiet || git commit -m "Update submodules: ${{ github.event.action }}"
           git push origin production || echo "No changes to push"
 
       - name: Create Environment Files
