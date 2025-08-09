@@ -1,4 +1,4 @@
-# 🤖 AI2AIs Deployment
+# AI2AIs Deployment
 
 Production deployment configuration for the AI2AIs autonomous debate system.
 
