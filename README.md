@@ -14,4 +14,4 @@ cp .env.example .env
 # Edit .env with your values
 
 # Deploy
-./scripts/deploy.sh
+./scripts/deploy.sh# Deploy Sun Aug 10 01:07:10 +03 2025
