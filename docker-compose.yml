@@ -39,7 +39,7 @@ services:
       redis:
         condition: service_healthy
     volumes:
-      - ./data/voices:/app/data/voices:ro
+      #- ./data/voices:/app/data/voices:ro
       - ./logs/core:/app/logs
       - ./temp:/app/temp
     healthcheck:
