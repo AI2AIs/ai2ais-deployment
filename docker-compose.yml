@@ -102,14 +102,12 @@ services:
       POSTGRES_EFFECTIVE_CACHE_SIZE: 1GB
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./services/ai2ais-core/scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ai2ais_user -d ai2ais_db"]
       interval: 10s
       timeout: 5s
       retries: 5
-    command: postgres -c config_file=/etc/postgresql/postgresql.conf
 
   # Qdrant Vector Database
   qdrant:
