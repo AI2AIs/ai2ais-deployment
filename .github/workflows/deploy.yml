@@ -128,6 +128,25 @@ jobs:
           fi
           echo "SSH connection successful"
 
+      - name: Create SSL Certificates
+        env:
+          CF_ORIGIN_CERT: ${{ secrets.CF_ORIGIN_CERT }}
+          CF_PRIVATE_KEY: ${{ secrets.CF_PRIVATE_KEY }}
+        run: |
+          echo "Creating SSL certificate files..."
+          
+          if [ -z "$CF_ORIGIN_CERT" ] || [ -z "$CF_PRIVATE_KEY" ]; then
+            echo "SSL certificates not found in secrets, creating dummy files"
+            mkdir -p ssl
+            echo "# Dummy cert file" > ssl/fullchain.pem
+            echo "# Dummy key file" > ssl/privkey.pem
+          else
+            mkdir -p ssl
+            echo "$CF_ORIGIN_CERT" > ssl/fullchain.pem
+            echo "$CF_PRIVATE_KEY" > ssl/privkey.pem
+            echo "SSL certificates created from secrets"
+          fi
+
       - name: Deploy to Server
         env:
           SERVER_HOST: ${{ secrets.DO_HOST }}
