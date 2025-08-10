@@ -159,29 +159,11 @@ jobs:
             set -e  # Exit on any error
             echo "Preparing deployment directory..."
             
-            if [ ! -d "~/ai2ais-deployment/.git" ]; then
-              echo "Git repository not found. Creating new..."
-              rm -rf ~/ai2ais-deployment
-              mkdir -p ~/ai2ais-deployment
-              cd ~/ai2ais-deployment
-              git clone https://github.com/AI2AIs/ai2ais-deployment.git .
-              git submodule update --init --recursive
-            else
-              echo "Git repository exists. Updating..."
-              cd ~/ai2ais-deployment
-              git fetch origin
-              git reset --hard origin/main
-              git clean -fd
-              git submodule foreach --recursive 'git clean -fd'
-              git submodule update --init --recursive --force
-            fi
+            rm -rf ~/ai2ais-deployment
+            git clone https://x-access-token:${GH_PAT}@github.com/AI2AIs/ai2ais-deployment.git ~/ai2ais-deployment
+            cd ~/ai2ais-deployment
 
             echo "Fetching latest changes..."
-            git fetch origin
-            git reset --hard origin/main
-            git config --global url."https://x-access-token:${GH_PAT}@github.com/".insteadOf "https://github.com/"
-            
-            echo "Force updating submodules..."
             git submodule update --init --recursive --force
 
             echo "FORCING SUBMODULES TO LATEST COMMITS..."
