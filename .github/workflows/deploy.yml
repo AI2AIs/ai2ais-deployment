@@ -215,7 +215,10 @@ jobs:
           scp services/ai2ais-core/.env.production $SERVER_USER@$SERVER_HOST:~/ai2ais-deployment/services/ai2ais-core/.env.production
           scp services/ai2ais-frontend/.env.production $SERVER_USER@$SERVER_HOST:~/ai2ais-deployment/services/ai2ais-frontend/.env.production
           
+          echo "🔐 Copying SSL certificates to server..."
+          scp -r ssl/ $SERVER_USER@$SERVER_HOST:~/ai2ais-deployment/ssl/
           echo " Deploying AI2AIs with Docker..."
+          
           ssh $SERVER_USER@$SERVER_HOST "GH_PAT='$GH_PAT' bash -s" << 'ENDSSH'
             set -e  # Exit on any error
             cd ~/ai2ais-deployment
