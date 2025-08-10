@@ -74,8 +74,6 @@ services:
       - ai2ais-core
     volumes:
       - ./logs/frontend:/app/logs
-    profiles:
-      - frontend  # Optional service
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:3000 || exit 1"]
       interval: 30s
@@ -175,8 +173,6 @@ services:
     depends_on:
       - ai2ais-core
     restart: unless-stopped
-    profiles:
-      - nginx  # Optional service
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost/health || exit 1"]
       interval: 30s
