@@ -215,7 +215,7 @@ jobs:
           scp services/ai2ais-core/.env.production $SERVER_USER@$SERVER_HOST:~/ai2ais-deployment/services/ai2ais-core/.env.production
           scp services/ai2ais-frontend/.env.production $SERVER_USER@$SERVER_HOST:~/ai2ais-deployment/services/ai2ais-frontend/.env.production
           
-          echo "🔐 Copying SSL certificates to server..."
+          echo "Copying SSL certificates to server..."
           scp -r ssl/ $SERVER_USER@$SERVER_HOST:~/ai2ais-deployment/ssl/
           echo " Deploying AI2AIs with Docker..."
           
