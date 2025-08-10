@@ -49,7 +49,7 @@ services:
       retries: 3
       start_period: 60s
 
-  # AI2AIs Frontend (Optional)
+  # AI2AIs Frontend
   ai2ais-frontend:
     build: 
       context: ./services/ai2ais-frontend
@@ -128,12 +128,6 @@ services:
     volumes:
       - qdrant_data:/qdrant/storage
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:6333/health || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
 
   # Redis Cache
   redis:
