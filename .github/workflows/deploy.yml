@@ -216,7 +216,10 @@ jobs:
           scp services/ai2ais-frontend/.env.production $SERVER_USER@$SERVER_HOST:~/ai2ais-deployment/services/ai2ais-frontend/.env.production
           
           echo "Copying SSL certificates to server..."
-          scp -r ssl/ $SERVER_USER@$SERVER_HOST:~/ai2ais-deployment/ssl/
+          ssh $SERVER_USER@$SERVER_HOST "mkdir -p ~/ai2ais-deployment/ssl"
+          scp ssl/fullchain.pem $SERVER_USER@$SERVER_HOST:~/ai2ais-deployment/ssl/
+          scp ssl/privkey.pem $SERVER_USER@$SERVER_HOST:~/ai2ais-deployment/ssl/
+          echo "SSL certificates copied successfully"
           echo " Deploying AI2AIs with Docker..."
           
           ssh $SERVER_USER@$SERVER_HOST "GH_PAT='$GH_PAT' bash -s" << 'ENDSSH'
