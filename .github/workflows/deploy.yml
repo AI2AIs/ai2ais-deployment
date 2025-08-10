@@ -24,7 +24,7 @@ jobs:
           git config --global user.email 'actions@github.com'
           git remote set-url origin https://x-access-token:${GH_PAT}@github.com/AI2AIs/ai2ais-deployment.git
 
-          git checkout production
+          git checkout main
 
           # Force update specific submodule based on dispatch type
           if [ "${{ github.event.action }}" == "ai2ais-core-update" ]; then
@@ -55,7 +55,7 @@ jobs:
           # Update the parent repo's reference to the submodules
           git add .
           git diff --staged --quiet || git commit -m "Update submodules: ${{ github.event.action }}"
-          git push origin production || echo "No changes to push"
+          git push origin main || echo "No changes to push"
 
       - name: Create Environment Files
         env:
@@ -151,7 +151,7 @@ jobs:
               echo "Git repository exists. Updating..."
               cd ~/ai2ais-deployment
               git fetch origin
-              git reset --hard origin/production
+              git reset --hard origin/main
               git clean -fd
               git submodule foreach --recursive 'git clean -fd'
               git submodule update --init --recursive --force
@@ -159,7 +159,7 @@ jobs:
 
             echo "Fetching latest changes..."
             git fetch origin
-            git reset --hard origin/production
+            git reset --hard origin/main
             git config --global url."https://x-access-token:${GH_PAT}@github.com/".insteadOf "https://github.com/"
             
             echo "Force updating submodules..."
